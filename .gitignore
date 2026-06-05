@@ -1,0 +1,26 @@
+# Terraform
+.terraform/
+
+# State files
+*.tfstate
+*.tfstate.*
+
+# Plan files
+*.tfplan
+
+# Sensitive variables
+terraform.tfvars
+*.auto.tfvars
+
+# Logs
+crash.log
+crash.*.log
+
+# IDEs
+.vscode/
+.idea/
+
+# OS files
+*.swp
+*.bak
+*.backup
