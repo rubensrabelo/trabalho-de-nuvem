@@ -1,24 +1,97 @@
-## Conteúdo do arquivo `docs/terraform-comandos.md`
+# Guia de Execução - Terraform + Ansible
 
-# Comandos Terraform - Guia Completo
-
-Este documento reúne os principais comandos utilizados no projeto Terraform.
+Este documento apresenta a sequência completa de comandos para provisionar, configurar, validar e destruir a infraestrutura do projeto.
 
 ---
 
-## 1. Inicializar o Terraform
+# 1. Pré-requisitos
 
-Baixa os providers e prepara o ambiente:
+Verifique se as ferramentas estão instaladas:
+
+```bash
+terraform --version
+aws --version
+ansible --version
+ssh -V
+```
+
+---
+
+# 2. Configurar credenciais AWS
+
+Validar acesso à AWS:
+
+```bash
+aws sts get-caller-identity
+```
+
+Se necessário:
+
+```bash
+aws configure
+```
+
+---
+
+# 3. Configurar variáveis do Terraform
+
+Copiar o arquivo de exemplo:
+
+```bash
+cp terraform/terraform.tfvars.example terraform/terraform.tfvars
+```
+
+Editar:
+
+```bash
+nano terraform/terraform.tfvars
+```
+
+Exemplo:
+
+```hcl
+region        = "us-east-1"
+ami           = "ami-091138d0f0d41ff90"
+instance_type = "t2.micro"
+key_name      = "vockey"
+db_password   = "SenhaForte123!"
+```
+
+---
+
+# 4. Configurar chave SSH
+
+Verificar se a chave existe:
+
+```bash
+ls ~/Downloads/labsuser.pem
+```
+
+Ajustar permissões:
+
+```bash
+chmod 400 ~/Downloads/labsuser.pem
+```
+
+---
+
+# 5. Entrar na pasta Terraform
+
+```bash
+cd terraform
+```
+
+---
+
+# 6. Inicializar o Terraform
 
 ```bash
 terraform init
-````
+```
 
 ---
 
-## 2. Formatar arquivos
-
-Padroniza todos os arquivos `.tf`:
+# 7. Formatar arquivos
 
 ```bash
 terraform fmt -recursive
@@ -26,9 +99,7 @@ terraform fmt -recursive
 
 ---
 
-## 3. Validar configuração
-
-Verifica erros de sintaxe:
+# 8. Validar configuração
 
 ```bash
 terraform validate
@@ -36,9 +107,7 @@ terraform validate
 
 ---
 
-## 4. Criar plano de execução
-
-Gera e salva o plano em um arquivo:
+# 9. Gerar plano de execução
 
 ```bash
 terraform plan -out=tfplan
@@ -46,19 +115,22 @@ terraform plan -out=tfplan
 
 ---
 
-## 5. Ver o plano gerado
-
-Exibe o conteúdo do plano:
+# 10. Revisar o plano
 
 ```bash
 terraform show tfplan
 ```
 
+Verifique:
+
+* EC2
+* Security Group
+* RDS PostgreSQL
+* DB Subnet Group
+
 ---
 
-## 6. Aplicar o plano
-
-Executa exatamente o que foi planejado:
+# 11. Aplicar infraestrutura
 
 ```bash
 terraform apply -auto-approve tfplan
@@ -66,79 +138,229 @@ terraform apply -auto-approve tfplan
 
 ---
 
-## 7. Ver outputs
+# 12. Verificar outputs
 
-Mostrar todos os outputs:
+Mostrar todos:
 
 ```bash
 terraform output
 ```
 
-Output específico:
+Obter IP da EC2:
 
 ```bash
-terraform output ip_nginx
-terraform output endpoint_postgres
+terraform output -raw ip_nginx
+```
+
+Obter endpoint do PostgreSQL:
+
+```bash
+terraform output -raw endpoint_postgres
+```
+
+Exemplo:
+
+```text
+ip_nginx = 54.xxx.xxx.xxx
+
+endpoint_postgres =
+instancia-postgres.xxxxxxxxx.us-east-1.rds.amazonaws.com:5432
 ```
 
 ---
 
-## 8. Ver state
+# 13. Testar acesso SSH
 
-Listar recursos:
+Substitua pelo IP retornado:
+
+```bash
+ssh \
+-i ~/Downloads/labsuser.pem \
+ubuntu@IP_DA_EC2
+```
+
+Se conectar com sucesso:
+
+```bash
+exit
+```
+
+---
+
+# 14. Voltar para a raiz do projeto
+
+```bash
+cd ..
+```
+
+---
+
+# 15. Criar inventory do Ansible
+
+Arquivo:
+
+```text
+ansible/inventory.ini
+```
+
+Conteúdo:
+
+```ini
+[ec2]
+IP_DA_EC2 ansible_user=ubuntu ansible_ssh_private_key_file=/home/SEU_USUARIO/Downloads/labsuser.pem ansible_ssh_common_args='-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null'
+```
+
+---
+
+# 16. Criar configuração do Ansible
+
+Arquivo:
+
+```text
+ansible/ansible.cfg
+```
+
+Conteúdo:
+
+```ini
+[defaults]
+host_key_checking = False
+inventory = inventory.ini
+```
+
+---
+
+# 17. Testar comunicação do Ansible
+
+```bash
+ansible \
+-i ansible/inventory.ini \
+ec2 \
+-m ping \
+-e 'ansible_ssh_common_args="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"'
+```
+
+Resultado esperado:
+
+```text
+pong
+```
+
+---
+
+# 18. Executar o Playbook
+
+```bash
+ansible-playbook \
+-i ansible/inventory.ini \
+ansible/playbook.yml \
+-e 'ansible_ssh_common_args="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"'
+```
+
+---
+
+# 19. Verificar NGINX
+
+Abrir no navegador:
+
+```text
+http://IP_DA_EC2
+```
+
+Deve aparecer:
+
+```text
+Servidor NGINX rodando na AWS
+Provisionado com Terraform e configurado com Ansible
+```
+
+---
+
+# 20. Validar recursos criados
+
+Verificar outputs:
+
+```bash
+cd terraform
+
+terraform output
+```
+
+Verificar recursos no state:
 
 ```bash
 terraform state list
 ```
 
-Detalhar recurso:
-
-```bash
-terraform state show <resource>
-```
-
 ---
 
-## 9. Atualizar state
+# 21. Destruir a infraestrutura
 
-Sincronizar estado com AWS:
+Entrar na pasta Terraform:
 
 ```bash
-terraform refresh
+cd terraform
 ```
 
----
-
-## 10. Destruir infraestrutura
-
-Plano de destruição:
+Gerar plano de destruição:
 
 ```bash
 terraform plan -destroy -out=destroy.tfplan
 ```
 
-Executar destruição:
+Aplicar destruição:
 
 ```bash
 terraform apply -auto-approve destroy.tfplan
 ```
 
-Ou direto:
+---
+
+# 22. Limpar arquivos locais
 
 ```bash
-terraform destroy -auto-approve
+rm -rf .terraform
+
+rm -f .terraform.lock.hcl
+
+rm -f terraform.tfstate
+rm -f terraform.tfstate.backup
+
+rm -f tfplan
+rm -f destroy.tfplan
 ```
 
 ---
 
-## 11. Limpeza local
+# 23. Remover arquivos gerados pelo Ansible
 
-Remove arquivos locais do Terraform:
+Na raiz do projeto:
 
 ```bash
-rm -rf .terraform
-rm -f .terraform.lock.hcl
-rm -f terraform.tfstate*
-rm -f tfplan
-rm -f destroy.tfplan
+rm -f ansible/inventory.ini
+rm -f ansible/ansible.cfg
 ```
+
+---
+
+# Execução Automatizada
+
+Caso deseje executar tudo automaticamente:
+
+## Deploy
+
+```bash
+chmod +x scripts/deploy.sh
+
+./scripts/deploy.sh
+```
+
+## Destroy
+
+```bash
+chmod +x scripts/destroy.sh
+
+./scripts/destroy.sh
+```
+
+Esses scripts executam automaticamente todos os passos descritos neste guia.
