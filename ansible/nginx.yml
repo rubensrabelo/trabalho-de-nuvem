@@ -1,0 +1,33 @@
+- name: Configurar EC2 com NGINX
+  hosts: ec2
+  become: true
+
+  tasks:
+    - name: Atualizar cache do sistema
+      apt:
+        update_cache: yes
+
+    - name: Instalar NGINX
+      apt:
+        name: nginx
+        state: present
+
+    - name: Garantir que o NGINX está ativo
+      service:
+        name: nginx
+        state: started
+        enabled: true
+
+    - name: Criar página inicial customizada
+      copy:
+        dest: /var/www/html/index.html
+        content: |
+          <html>
+          <head>
+            <title>Terraform + Ansible</title>
+          </head>
+          <body>
+            <h1>Servidor NGINX rodando na AWS</h1>
+            <p>Provisionado com Terraform e configurado com Ansible</p>
+          </body>
+          </html>

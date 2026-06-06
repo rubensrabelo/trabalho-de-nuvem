@@ -1,26 +1,91 @@
-# Terraform
-.terraform/
 
-# State files
+# Terraform
+
+
+# Diretório de providers
+**/.terraform/*
+
+# Arquivo de lock (ignore apenas se for exigência da disciplina)
+.terraform.lock.hcl
+
+# State
 *.tfstate
 *.tfstate.*
+terraform.tfstate
+terraform.tfstate.backup
 
-# Plan files
+# Planos
 *.tfplan
+tfplan
+destroy.tfplan
 
-# Sensitive variables
+# Variáveis sensíveis
 terraform.tfvars
 *.auto.tfvars
+*.auto.tfvars.json
 
 # Logs
 crash.log
 crash.*.log
 
+# Overrides
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+
+# Ansible
+
+
+# Inventory gerado automaticamente
+ansible/inventory.ini
+ansible/ansible.cfg
+
+# Artefatos temporários
+*.retry
+
+
+# Chaves SSH
+
+
+*.pem
+*.ppk
+*.key
+
+
 # IDEs
+
+
 .vscode/
 .idea/
 
-# OS files
+
+# Sistema Operacional
+
+
+.DS_Store
+Thumbs.db
+
+# Linux/Vim
 *.swp
+*.swo
+*~
+
+# Arquivos temporários
+*.tmp
+*.temp
+
+# Backups
 *.bak
 *.backup
+
+
+# Python (caso use Ansible com virtualenv futuramente)
+
+
+__pycache__/
+*.pyc
+.venv/
+venv/
+env/
