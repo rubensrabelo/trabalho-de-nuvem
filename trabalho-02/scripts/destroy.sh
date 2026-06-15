@@ -40,7 +40,7 @@ cd ..
 echo ""
 echo "Removendo arquivos gerados pelo Ansible..."
 
-rm -f ansible/inventory.ini
+rm -f ansible/inventory.yml
 rm -f ansible/ansible.cfg
 
 echo ""

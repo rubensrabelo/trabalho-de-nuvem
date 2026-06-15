@@ -2,7 +2,7 @@
 
 Este diretório contém toda a infraestrutura como código (Infrastructure as Code - IaC) utilizada para provisionar os recursos necessários na AWS.
 
-O Terraform é responsável pela criação da infraestrutura, enquanto o Ansible é utilizado posteriormente para configurar a instância EC2.
+O Terraform é responsável pela criação da infraestrutura, enquanto o Ansible é utilizado posteriormente para configurar o ambiente Docker e realizar o deploy da aplicação.
 
 ---
 
@@ -10,10 +10,8 @@ O Terraform é responsável pela criação da infraestrutura, enquanto o Ansible
 
 Provisionar automaticamente os recursos necessários para o ambiente do projeto:
 
-* Instância EC2 Linux;
-* Security Group;
-* Banco de dados Amazon RDS PostgreSQL;
-* DB Subnet Group.
+* Instância EC2 Linux (Ubuntu);
+* Security Group configurado para tráfego web e gerencial.
 
 ---
 
@@ -21,12 +19,13 @@ Provisionar automaticamente os recursos necessários para o ambiente do projeto:
 
 ## EC2
 
-Instância responsável por hospedar o servidor NGINX que será configurado posteriormente pelo Ansible.
+Instância responsável por hospedar a infraestrutura Docker que será configurada posteriormente pelo Ansible.
 
 Características:
 
-* Sistema operacional Linux
-* IP público
+* Sistema operacional Linux (Ubuntu)
+* Tipo de instância `t2.micro`
+* IP público exposto no output
 * Acesso SSH utilizando chave privada
 * Associada ao Security Group do projeto
 
@@ -34,37 +33,16 @@ Características:
 
 ## Security Group
 
-Grupo de segurança utilizado pela EC2 e pelo RDS.
+Grupo de segurança utilizado para controlar o acesso à instância EC2.
 
 Portas liberadas:
 
 | Porta | Protocolo | Finalidade |
 | ----- | --------- | ---------- |
 | 22    | TCP       | SSH        |
-| 80    | TCP       | HTTP       |
-| 5432  | TCP       | PostgreSQL |
+| 80    | TCP       | HTTP (Tráfego da Aplicação / NGINX) |
 
----
-
-## Amazon RDS PostgreSQL
-
-Banco de dados gerenciado pela AWS.
-
-Características:
-
-* PostgreSQL 16
-* Instância `db.t3.micro`
-* Armazenamento de 20 GB
-* Subnet Group automático
-* Associado ao Security Group do projeto
-
----
-
-## DB Subnet Group
-
-Utiliza automaticamente as subnets existentes na VPC padrão da AWS.
-
-Necessário para a criação do banco de dados RDS.
+*(Nota: O acesso ao banco de dados e a porta 5432 foram removidos nesta versão).*
 
 ---
 
@@ -86,15 +64,12 @@ terraform/
     │   ├── variables.tf
     │   └── outputs.tf
     │
-    ├── rds/
-    │   ├── main.tf
-    │   ├── variables.tf
-    │   └── outputs.tf
-    │
     └── security-group/
         ├── main.tf
         └── outputs.tf
 ```
+
+*(Nota: O módulo `rds` foi completamente removido da estrutura do projeto).*
 
 ---
 
@@ -106,9 +81,9 @@ Responsável pela criação da instância EC2.
 
 Recursos:
 
-* EC2
-* Tags
-* Associação ao Security Group
+* EC2 (`aws_instance`)
+* Tags identificadoras
+* Associação ao Security Group do projeto
 
 Output:
 
@@ -120,36 +95,18 @@ public_ip
 
 ## modules/security-group
 
-Responsável pela criação do Security Group.
+Responsável pela criação do Security Group da aplicação.
 
 Regras configuradas:
 
-* SSH (22)
-* HTTP (80)
-* PostgreSQL (5432)
-* Saída liberada para internet
+* Entrada para SSH (22)
+* Entrada para HTTP (80)
+* Saída total liberada para a internet (`0.0.0.0/0`)
 
 Output:
 
 ```bash
 security_group_name
-```
-
----
-
-## modules/rds
-
-Responsável pela criação do banco PostgreSQL.
-
-Recursos:
-
-* DB Subnet Group
-* RDS PostgreSQL
-
-Output:
-
-```bash
-endpoint
 ```
 
 ---
@@ -175,8 +132,9 @@ region        = "us-east-1"
 ami           = "ami-091138d0f0d41ff90"
 instance_type = "t2.micro"
 key_name      = "vockey"
-db_password   = "SenhaForte123!"
 ```
+
+*(Nota: A variável `db_password` foi removida por não utilizarmos mais o RDS).*
 
 ---
 
@@ -200,32 +158,18 @@ Depois edite os valores conforme necessário.
 
 # Outputs
 
-Após a execução do Terraform, os seguintes outputs estarão disponíveis.
+Após a execução do Terraform, o seguinte output estará disponível para integração com o inventário dinâmico do Ansible.
 
 ## IP Público da EC2
 
 ```bash
-terraform output ip_nginx
+terraform output public_ip
 ```
 
-Exemplo:
+Exemplo de retorno:
 
 ```bash
 54.xxx.xxx.xxx
-```
-
----
-
-## Endpoint do PostgreSQL
-
-```bash
-terraform output endpoint_postgres
-```
-
-Exemplo:
-
-```bash
-instancia-postgres.xxxxxxxxx.us-east-1.rds.amazonaws.com:5432
 ```
 
 ---
@@ -235,17 +179,9 @@ instancia-postgres.xxxxxxxxx.us-east-1.rds.amazonaws.com:5432
 ```bash
 Terraform
 │
-├── Cria Security Group
+├── Cria Security Group (Portas 22 e 80)
 │
-├── Cria EC2
-│
-├── Obtém VPC padrão
-│
-├── Obtém Subnets padrão
-│
-├── Cria DB Subnet Group
-│
-└── Cria PostgreSQL RDS
+└── Cria EC2 (t2.micro Ubuntu)
 ```
 
 Após o término do Terraform:
@@ -256,9 +192,10 @@ Terraform
     ▼
 Ansible
     │
-    ├── Instala NGINX
-    ├── Configura serviço
-    └── Publica página HTML
+    ├── Instala ecossistema Docker (Engine & Compose)
+    ├── Copia arquivos locais para a EC2
+    ├── Constrói imagem local da aplicação
+    └── Inicializa contêineres via Docker Compose
 ```
 
 ---
@@ -327,12 +264,23 @@ Esses scripts executam automaticamente:
 # Boas Práticas Utilizadas
 
 * Modularização dos recursos;
-* Separação de responsabilidades;
-* Uso de variáveis externas;
-* Uso de outputs para integração com Ansible;
-* Versionamento seguro;
-* Infraestrutura reproduzível;
-* Estrutura organizada para manutenção futura.
+* Remoção completa de recursos e variáveis obsoletas (RDS);
+* Uso de variáveis externas para flexibilidade de infraestrutura;
+* Uso de outputs para integração simplificada com o Ansible;
+* Versionamento seguro de arquivos de estado;
+* Infraestrutura reproduzível e previsível.
+
+---
+
+# Diferenças em Relação ao Trabalho Anterior
+
+Para atender aos novos requisitos de conteinerização, as seguintes mudanças estruturais foram aplicadas nos arquivos do Terraform:
+
+* **Remoção do Módulo RDS:** Toda a pasta `modules/rds/` foi excluída, eliminando o provisionamento do banco de dados PostgreSQL.
+* **Simplificação do `main.tf` principal:** Foram removidas as chamadas para os blocos `aws_db_subnet_group` e `aws_db_instance`.
+* **Ajuste no Security Group (`securitygroup.tf`):** A regra de ingresso que liberava a porta `5432` (PostgreSQL) foi removida. Apenas as portas `22` (SSH) e `80` (HTTP) permanecem ativas.
+* **Limpeza de Variáveis (`variables.tf`):** A variável global `db_password` foi totalmente removida do escopo do projeto por se tornar obsoleta.
+* **Ajuste nos Outputs (`outputs.tf`):** O output que exibia o `endpoint` do RDS foi removido, mantendo-se apenas o IP público da instância EC2.
 
 ---
 

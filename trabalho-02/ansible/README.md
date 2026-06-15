@@ -1,121 +1,90 @@
 # Ansible
 
-Este diretório contém os arquivos responsáveis pela configuração automática da instância EC2 provisionada pelo Terraform.
+Este diretório contém os arquivos responsáveis pela configuração automatizada da instância EC2 e pelo deploy da aplicação conteinerizada divididos em papéis estruturados (`roles`).
 
-O Ansible é utilizado para instalar e configurar o servidor NGINX após a criação da infraestrutura na AWS.
+O Ansible é utilizado para preparar o ambiente (Engine do Docker) e orquestrar a inicialização dos contêineres após a criação da infraestrutura na AWS via Terraform.
 
 ---
 
 # Objetivo
 
-Após o Terraform criar a instância EC2, o Ansible é responsável por:
+Após o Terraform criar a instância EC2, o Ansible assume o controle para realizar as seguintes operações divididas por responsabilidade:
 
-* Conectar na EC2 via SSH;
-* Atualizar o cache de pacotes do sistema;
-* Instalar o NGINX;
-* Iniciar o serviço;
-* Habilitar a inicialização automática do NGINX;
-* Criar uma página HTML personalizada.
-
-Dessa forma, a responsabilidade do projeto fica dividida entre:
-
-## Terraform
-
-Provisionamento da infraestrutura:
-
-* EC2
-* Security Group
-* RDS PostgreSQL
-* DB Subnet Group
-
-## Ansible
-
-Configuração da instância:
-
-* Instalação do NGINX
-* Configuração do serviço
-* Publicação da página web
+* **Role `docker_install`**: Instala e configura o ecossistema Docker (`docker-ce`, `docker-ce-cli`, `containerd.io` e `docker-compose-plugin`) e adiciona o usuário `ubuntu` ao grupo do Docker.
+* **Role `app_deploy`**: Copia os arquivos locais do projeto, constrói a imagem Docker customizada em Python (*showip*) e gerencia a inicialização dos serviços via Docker Compose.
 
 ---
 
 # Estrutura do Diretório
 
+A organização atual das receitas e automações segue a estrutura abaixo:
+
 ```bash
-meu-projeto-iac/
-├── inventario.yml
-├── playbook.yml
+.
 ├── docker.yml
+├── inventory.yml
 ├── nginx.yml
-└── roles/
-    ├── docker_install/     # ROLE 1: Instala o motor do Docker
-    │   └── tasks/
+├── playbook.yml
+├── README.md
+└── roles
+    ├── app_deploy
+    │   ├── defaults
+    │   │   └── main.yml
+    │   └── tasks
     │       └── main.yml
-    └── app_deploy/         # ROLE 2: Copia os arquivos e sobe o Docker Compose
-        ├── defaults/
-        │   └── main.yml
-        └── tasks/
+    └── docker_install
+        └── tasks
             └── main.yml
 ```
 
+> **Aviso Importante:** Os arquivos `inventory.ini` e `ansible.cfg` são gerados automaticamente pelo script `deploy.sh` na raiz do projeto. Caso você opte por realizar a execução de forma manual, esses arquivos deverão ser criados e configurados manualmente na raiz deste diretório conforme detalhado na documentação contida em `docs/SCRIPTS.md`.
+
 ---
 
-# Arquivos
+# Arquivos e Componentes
 
 ## playbook.yml
-
-Playbook principal do projeto.
-
-Responsável por executar o arquivo:
+O arquivo principal de execução. Ele atua como um orquestrador de alto nível, importando os playbooks específicos na ordem cronológica correta para garantir que a aplicação só seja implantada após o motor do Docker estar pronto.
 
 ```yaml
+- import_playbook: docker.yml
 - import_playbook: nginx.yml
 ```
 
----
+## docker.yml
+Playbook intermediário responsável por aplicar as configurações de infraestrutura do Docker na instância chamando a role correspondente:
+
+```yaml
+- name: Instalar Docker
+  hosts: ec2
+  become: true
+  roles:
+    - docker_install
+```
 
 ## nginx.yml
+Playbook intermediário responsável por gerenciar o deploy da aplicação e do proxy reverso chamando a role de implantação:
 
-Contém todas as tarefas executadas pelo Ansible:
-
-* Atualização do cache do sistema;
-* Instalação do NGINX;
-* Inicialização do serviço;
-* Habilitação do serviço no boot;
-* Criação da página HTML.
-
----
-
-## inventory.ini
-
-Arquivo que contém os hosts gerenciados pelo Ansible.
-
-Exemplo:
-
-```ini
-[ec2]
-54.xxx.xxx.xxx ansible_user=ubuntu ansible_ssh_private_key_file=/home/usuario/Downloads/labsuser.pem
+```yaml
+- name: Deploy da Aplicacao
+  hosts: ec2
+  become: true
+  roles:
+    - app_deploy
 ```
 
-> **Observação:** Este arquivo não é versionado no repositório.
->
-> * Na execução manual, deve ser criado conforme descrito em `docs/SCRIPTS.md`.
-> * Na execução automatizada, é criado automaticamente pelo script `deploy.sh`.
+## roles/docker_install/tasks/main.yml
+Contém as tarefas de sistema operacional executadas pelo playbook `docker.yml`:
+* Atualização dos caches de pacotes (`apt`).
+* Instalação das chaves GPG e repositórios oficiais do Docker.
+* Instalação dos pacotes de runtime e do `docker-compose-plugin`.
+* Configuração do usuário padrão `ubuntu` no grupo Unix `docker` para evitar a necessidade de privilégios de `sudo`.
 
----
-
-## ansible.cfg
-
-Arquivo de configuração do Ansible.
-
-Exemplo:
-
-```ini
-[defaults]
-host_key_checking = False
-inventory = inventory.ini
-```
-
-> **Observação:** Este arquivo também é gerado automaticamente pelo script `deploy.sh` e removido pelo script `destroy.sh`.
+## roles/app_deploy/tasks/main.yml
+Gerencia o ciclo de vida e deploy da aplicação executado pelo playbook `nginx.yml`:
+* Transferência dos arquivos necessários (`Dockerfile`, `requirements.txt`, códigos Flask, arquivo de proxy do NGINX e o `docker-compose.yml`) do ambiente local para o servidor de nuvem.
+* Execução do build local da imagem customizada (`showip:latest`).
+* Inicialização da stack de microsserviços em background com o comando `docker compose up -d`.
 
 ---
 
@@ -124,96 +93,40 @@ inventory = inventory.ini
 ```text
 Terraform
     │
-    ├── Cria EC2
-    ├── Cria Security Group
-    └── Cria RDS
+    └── Cria EC2 (Ubuntu) e Security Group (Portas 22 e 80)
             │
             ▼
-Ansible
+Ansible (playbook.yml)
     │
-    ├── Conecta na EC2
-    ├── Instala NGINX
-    ├── Inicia serviço
-    └── Cria página HTML
+    ├── Importa docker.yml ─── [Role: docker_install] ── Instala o Engine do Docker na EC2
+    └── Importa nginx.yml  ─── [Role: app_deploy]     ── Envia arquivos e sobe o Docker Compose
 ```
 
 ---
 
 # Resultado Esperado
 
-Após a execução do playbook:
+Após a execução bem-sucedida do playbook, três contêineres estarão em execução na rede virtual isolada `devops`:
+* O contêiner `nginx` escutando e gerenciando os acessos na porta pública 80.
+* Os contêineres `app1` e `app2` processando de forma independente o backend em Python.
 
-* O NGINX estará instalado;
-* O serviço estará em execução;
-* O serviço será iniciado automaticamente após reboot;
-* A página HTML personalizada estará disponível.
-
-Acesso:
-
+Acesso para validação:
 ```bash
-http://IP_DA_EC2
+curl http://<IP_DA_EC2>/app1
+curl http://<IP_DA_EC2>/app2
 ```
-
-Página exibida:
-
-```bash
-Servidor NGINX rodando na AWS
-Provisionado com Terraform e configurado com Ansible
-```
+O retorno em ambas as URLs deve exibir **endereços IPs internos diferentes**, validando o isolamento de rede e a correta distribuição efetuada pelo proxy reverso do NGINX.
 
 ---
 
-# Execução
+# Diferenças em Relação ao Trabalho Anterior
 
-A documentação completa de execução do projeto encontra-se em:
+Para atender aos novos critérios de conteinerização do projeto, as seguintes atualizações estruturais foram implementadas nesta pasta:
 
-[Saiba mais](docs/SCRIPTS.md)
-
-
-Neste documento estão descritos:
-
-* Configuração do ambiente;
-* Criação do inventory;
-* Testes de conectividade;
-* Execução dos playbooks;
-* Provisionamento com Terraform;
-* Destruição da infraestrutura.
-
----
-
-# Execução Automatizada
-
-O projeto disponibiliza scripts para automatizar todo o processo.
-
-Deploy completo:
-
-```bash
-./scripts/deploy.sh
-```
-
-Destruição completa:
-
-```bash
-./scripts/destroy.sh
-```
-
-Esses scripts realizam automaticamente:
-
-* Provisionamento da infraestrutura;
-* Geração do inventory;
-* Configuração do Ansible;
-* Instalação do NGINX;
-* Limpeza do ambiente.
-
----
-
-# Boas Práticas
-
-* Não versionar arquivos contendo informações específicas do ambiente (`inventory.ini`);
-* Não versionar chaves SSH (`*.pem`);
-* Utilizar playbooks pequenos e organizados;
-* Separar provisionamento (Terraform) de configuração (Ansible);
-* Manter a documentação atualizada.
+* **Modularização com Roles:** A lógica do projeto foi completamente encapsulada em duas sub-roles (`docker_install` e `app_deploy`), limpando a raiz do projeto e seguindo as boas práticas oficiais do Ansible.
+* **Evolução dos Playbooks de Raiz:** Os arquivos `docker.yml` e `nginx.yml` deixaram de executar tarefas diretas na máquina física (*bare-metal*). Agora, eles funcionam como pontes organizacionais para engatilhar as novas roles conteinerizadas.
+* **Automação do Ciclo Docker:** O Ansible deixou de configurar páginas HTML estáticas locais. Agora, ele lida com a transferência de receitas de infraestrutura, automação de `docker build` e orquestração de microsserviços via Docker Compose.
+* **Gestão de Grupos e Permissões:** Foi adicionada a tratativa de usuários para o ecossistema Docker, garantindo que o deploy aconteça sem quebras de privilégios na EC2.
 
 ---
 
@@ -222,7 +135,6 @@ Esses scripts realizam automaticamente:
 Documentação principal:
 
 [Saiba mais](../README.md)
-
 
 Documentação do Terraform:
 

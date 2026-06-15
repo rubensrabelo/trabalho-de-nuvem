@@ -1,16 +1,16 @@
 # Trabalho de Computação em Nuvem
 
-Projeto desenvolvido utilizando **Terraform** e **Ansible** para provisionamento e configuração automatizada de infraestrutura na AWS.
+Projeto desenvolvido utilizando **Terraform**, **Ansible** e **Docker Compose** para provisionamento e implantação automatizada de uma aplicação conteinerizada na AWS.
 
 ---
 
 # Objetivo
 
-O objetivo deste projeto é demonstrar a utilização de ferramentas de **Infraestrutura como Código (IaC)** e automação de configuração para provisionar um ambiente composto por:
+O objetivo deste projeto é demonstrar a utilização de ferramentas de **Infraestrutura como Código (IaC)**, automação de configuração e **conteinerização** para provisionar um ambiente composto por:
 
 * Uma instância EC2 na AWS;
-* Um banco de dados PostgreSQL utilizando Amazon RDS;
-* Um servidor NGINX instalado e configurado automaticamente via Ansible.
+* Docker e Docker Compose instalados e configurados automaticamente via Ansible;
+* Uma aplicação composta por múltiplos contêineres (NGINX como proxy reverso e duas instâncias da aplicação Python *showip*).
 
 ---
 
@@ -20,7 +20,7 @@ A infraestrutura provisionada é composta pelos seguintes recursos:
 
 ## Compute
 
-* Instância EC2 Linux
+* Instância EC2 Linux (Ubuntu)
 
 ## Rede e Segurança
 
@@ -28,21 +28,23 @@ A infraestrutura provisionada é composta pelos seguintes recursos:
 
   * SSH (porta 22)
   * HTTP (porta 80)
-  * PostgreSQL (porta 5432)
 
-## Banco de Dados
+## Orquestração e Contêineres
 
-* Amazon RDS PostgreSQL 16
-* DB Subnet Group utilizando a VPC padrão da AWS
+* Docker Compose gerenciando a rede interna `devops` com 3 contêineres:
+  * Contêiner `nginx`: Proxy reverso escutando na porta 80.
+  * Contêiner `app1`: Instância da aplicação Python *showip*.
+  * Contêiner `app2`: Segunda instância da aplicação Python *showip*.
 
 ## Configuração
 
 Após a criação da infraestrutura pelo Terraform, o Ansible é responsável por:
 
 * Atualizar os pacotes do sistema operacional;
-* Instalar o NGINX;
-* Iniciar e habilitar o serviço;
-* Publicar uma página HTML personalizada.
+* Instalar o Docker e o plugin do Docker Compose;
+* Adicionar o usuário `ubuntu` ao grupo do Docker;
+* Copiar os arquivos da aplicação para a instância;
+* Construir a imagem Docker localmente e subir os contêineres.
 
 ---
 
@@ -52,33 +54,10 @@ Após a criação da infraestrutura pelo Terraform, o Ansible é responsável po
 .
 ├── README.md
 ├── .gitignore
-│
 ├── docs/
-│   └── SCRIPTS.md
-│
 ├── scripts/
-│   ├── deploy.sh
-│   └── destroy.sh
-│
 ├── terraform/
-│   ├── README.md
-│   ├── provider.tf
-│   ├── variables.tf
-│   ├── outputs.tf
-│   ├── main.tf
-│   ├── terraform.tfvars
-│   ├── terraform.tfvars.example
-│   └── modules/
-│       ├── ec2/
-│       ├── rds/
-│       └── security-group/
-│
 └── ansible/
-    ├── README.md
-    ├── playbook.yml
-    ├── nginx.yml
-    ├── inventory.ini  
-    └── ansible.cfg
 ```
 
 > **Observação:** Os arquivos `inventory.ini` e `ansible.cfg` são gerados automaticamente pelos scripts `deploy.sh` e `destroy.sh`. Caso a execução seja realizada manualmente, eles deverão ser criados conforme a documentação em `docs/SCRIPTS.md`.
@@ -92,12 +71,9 @@ Após a criação da infraestrutura pelo Terraform, o Ansible é responsável po
 Responsável pelo provisionamento da infraestrutura AWS:
 
 * EC2
-* Security Group
-* RDS PostgreSQL
-* DB Subnet Group
+* Security Group (portas 22 e 80)
 
 Documentação específica:
-
 
 [Saiba mais](./terraform/README.md)
 
@@ -105,11 +81,11 @@ Documentação específica:
 
 ## Ansible
 
-Responsável pela configuração da instância EC2:
+Responsável pela configuração da instância EC2 e deploy:
 
-* Instalação do NGINX
-* Configuração do serviço
-* Criação da página inicial
+* Instalação do Docker e Docker Compose
+* Transferência dos arquivos da aplicação
+* Inicialização da aplicação conteinerizada via Docker Compose
 
 Documentação específica:
 
@@ -182,7 +158,6 @@ estão documentados em:
 
 [Saiba mais](docs/SCRIPTS.md)
 
-
 ---
 
 # Fluxo de Execução
@@ -190,12 +165,13 @@ estão documentados em:
 1. Configurar credenciais AWS;
 2. Configurar variáveis do Terraform;
 3. Executar Terraform;
-4. Provisionar EC2 e RDS;
+4. Provisionar EC2 e Security Group;
 5. Obter o IP da EC2;
 6. Executar o Ansible;
-7. Instalar e configurar o NGINX;
-8. Validar acesso via navegador;
-9. Destruir a infraestrutura ao final dos testes.
+7. Instalar Docker e Docker Compose na EC2;
+8. Enviar os arquivos e subir os contêineres da aplicação;
+9. Validar acesso via navegador ou curl;
+10. Destruir a infraestrutura ao final dos testes.
 
 ---
 
@@ -207,19 +183,20 @@ Após a execução do projeto:
 
 Uma instância EC2 deve estar disponível e acessível via SSH.
 
-## PostgreSQL
+## Docker e Contêineres
 
-Uma instância Amazon RDS PostgreSQL deve estar disponível.
+Três contêineres devem estar em execução dentro da instância EC2 de forma isolada.
 
-## NGINX
+## NGINX / Aplicação
 
-Ao acessar o IP público da EC2 no navegador:
+Ao acessar as rotas no navegador ou via terminal:
 
 ```bash
-http://IP_DA_EC2
+http://IP_DA_EC2/app1
+http://IP_DA_EC2/app2
 ```
 
-deve ser exibida uma página HTML informando que o servidor foi provisionado com Terraform e configurado com Ansible.
+O servidor deve responder com sucesso em ambas as URLs, exibindo endereços IP internos **diferentes** para cada rota, comprovando que o NGINX está direcionando o tráfego para contêineres distintos.
 
 ---
 
@@ -229,7 +206,8 @@ Este projeto possui finalidade acadêmica e foi desenvolvido para demonstrar:
 
 * Infraestrutura como Código (IaC);
 * Provisionamento automatizado com Terraform;
-* Automação de configuração com Ansible;
+* Automação de configuração e deploy com Ansible;
+* Implantação de microsserviços com Docker Compose;
 * Modularização de projetos;
 * Boas práticas de organização e documentação.
 

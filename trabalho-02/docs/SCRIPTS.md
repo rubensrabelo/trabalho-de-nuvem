@@ -149,22 +149,13 @@ terraform output
 Obter IP da EC2:
 
 ```bash
-terraform output -raw ip_nginx
-```
-
-Obter endpoint do PostgreSQL:
-
-```bash
-terraform output -raw endpoint_postgres
+terraform output -raw public_ip_ec2
 ```
 
 Exemplo:
 
 ```text
-ip_nginx = 54.xxx.xxx.xxx
-
-endpoint_postgres =
-instancia-postgres.xxxxxxxxx.us-east-1.rds.amazonaws.com:5432
+public_ip_ec2 = 54.xxx.xxx.xxx
 ```
 
 ---
