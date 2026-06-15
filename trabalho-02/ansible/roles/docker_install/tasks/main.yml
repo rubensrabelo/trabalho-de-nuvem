@@ -18,7 +18,7 @@
 
 - name: Adicionar a chave GPG oficial do Docker
   get_url:
-    url: https://download.docker.com/linux/ubuntu/gpg   # ✅ URL correta
+    url: https://download.docker.com/linux/ubuntu/gpg
     dest: /etc/apt/keyrings/docker.asc
     mode: 'a+r'
 
@@ -26,7 +26,7 @@
   deb822_repository:
     name: docker
     types: deb
-    uris: https://download.docker.com/linux/ubuntu      # ✅ URL correta
+    uris: https://download.docker.com/linux/ubuntu   
     suites: jammy
     components: stable
     signed_by: /etc/apt/keyrings/docker.asc
