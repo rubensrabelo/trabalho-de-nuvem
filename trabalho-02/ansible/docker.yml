@@ -1,0 +1,5 @@
+- name: Executar a instalacao do Motor do Docker via Role
+  hosts: servidor_docker
+  become: yes
+  roles:
+    - docker_install

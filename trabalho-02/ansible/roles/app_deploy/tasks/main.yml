@@ -1,0 +1,24 @@
+- name: Criar o diretorio do aplicativo na instancia EC2
+  file:
+    path: "{{ app_pasta_remota }}"
+    state: directory
+    owner: ubuntu
+    group: ubuntu
+    mode: '0755'
+
+- name: Copiar todo o diretorio da aplicacao para a instancia
+  copy:
+    src: "{{ app_pasta_local }}"
+    dest: "{{ app_pasta_remota }}/"
+    owner: ubuntu
+    group: ubuntu
+
+- name: Construir a imagem showip:latest com docker build
+  shell: "docker build -t showip:latest ."
+  args:
+    chdir: "{{ app_pasta_remota }}"
+
+- name: Subir a pilha de conteineres (Nginx + Apps) com docker compose up -d
+  shell: "docker compose up -d"
+  args:
+    chdir: "{{ app_pasta_remota }}"

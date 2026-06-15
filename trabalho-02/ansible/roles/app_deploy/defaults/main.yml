@@ -1,0 +1,2 @@
+app_pasta_local: "{{ playbook_dir }}/../arquivos_do_app/"
+app_pasta_remota: "/home/ubuntu/meu_app"

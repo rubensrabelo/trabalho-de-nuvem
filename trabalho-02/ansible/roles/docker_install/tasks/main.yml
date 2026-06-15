@@ -1,0 +1,55 @@
+- name: Atualizar o cache do gerenciador de pacotes APT
+  apt:
+    update_cache: yes
+    cache_valid_time: 3600
+
+- name: Instalar pacotes de dependencia do sistema
+  apt:
+    name:
+      - ca-certificates
+      - curl
+    state: present
+
+- name: Criar diretorio para chaves de seguranca do APT
+  file:
+    path: /etc/apt/keyrings
+    state: directory
+    mode: '0755'
+
+- name: Adicionar a chave GPG oficial do Docker
+  get_url:
+    url: https://download.docker.com/linux/ubuntu/gpg   # ✅ URL correta
+    dest: /etc/apt/keyrings/docker.asc
+    mode: 'a+r'
+
+- name: Configurar o repositorio oficial estavel do Docker
+  deb822_repository:
+    name: docker
+    types: deb
+    uris: https://download.docker.com/linux/ubuntu      # ✅ URL correta
+    suites: jammy
+    components: stable
+    signed_by: /etc/apt/keyrings/docker.asc
+    state: present
+
+- name: Instalar componentes oficiais do Docker (docker-ce e plugins)
+  apt:
+    name:
+      - docker-ce
+      - docker-ce-cli
+      - containerd.io
+      - docker-compose-plugin
+    state: present
+    update_cache: yes
+
+- name: Garantir que o servico do Docker esta ativo e habilitado
+  service:
+    name: docker
+    state: started
+    enabled: yes
+
+- name: Adicionar o usuario ubuntu ao grupo docker
+  user:
+    name: ubuntu
+    groups: docker
+    append: yes

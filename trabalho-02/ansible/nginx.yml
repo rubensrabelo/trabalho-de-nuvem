@@ -1,0 +1,5 @@
+- name: Executar a implantacao do Nginx e Apps via Role
+  hosts: servidor_docker
+  become: yes
+  roles:
+    - app_deploy
