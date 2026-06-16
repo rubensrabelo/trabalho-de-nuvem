@@ -123,3 +123,7 @@ Documentação do Terraform:
 Documentação do Ansible:
 
 [Saiba mais](../ansible/README.md)
+
+Guia de execução:
+
+[Saiba mais](../docs/SCRIPTS.md)

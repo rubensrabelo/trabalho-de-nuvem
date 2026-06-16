@@ -294,6 +294,10 @@ Documentação do Ansible:
 
 [Saiba mais](../ansible/README.md)
 
+Documentação da API:
+
+[Sabia mais](arquivos_do_app/README.md)
+
 Guia de execução:
 
 [Saiba mais](../docs/SCRIPTS.md)
