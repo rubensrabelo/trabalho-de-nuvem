@@ -18,6 +18,34 @@ O objetivo deste projeto é demonstrar a utilização de ferramentas de **Infrae
 
 A infraestrutura provisionada é composta pelos seguintes recursos:
 
+## Diagrama da Arquitetura
+
+```mermaid
+flowchart LR
+
+    User[Usuário]
+
+    subgraph AWS
+        EC2[EC2 Linux]
+        SG[Security Group]
+        RDS[(Amazon RDS PostgreSQL)]
+
+        SG --> EC2
+        SG --> RDS
+    end
+
+    User -->|SSH 22| EC2
+    User -->|HTTP 80| EC2
+
+    EC2 -->|PostgreSQL 5432| RDS
+
+    Terraform[Terraform] --> EC2
+    Terraform --> SG
+    Terraform --> RDS
+
+    Ansible[Ansible] --> EC2
+```
+
 ## Compute
 
 * Instância EC2 Linux

@@ -18,6 +18,31 @@ O objetivo deste projeto é demonstrar a utilização de ferramentas de **Infrae
 
 A infraestrutura provisionada é composta pelos seguintes recursos:
 
+## Diagrama da Arquitetura
+
+```mermaid
+flowchart LR
+
+    T["Terraform"] --> EC2["EC2 Ubuntu"]
+
+    A["Ansible"] --> EC2
+
+    subgraph AWS["AWS"]
+        EC2
+
+        subgraph DC["Docker Compose"]
+            N["NGINX<br/>Proxy Reverso"]
+            APP1["showip - app1"]
+            APP2["showip - app2"]
+
+            N --> APP1
+            N --> APP2
+        end
+    end
+
+    USER["Usuário"] -->|HTTP :80| N
+```
+
 ## Compute
 
 * Instância EC2 Linux (Ubuntu)
