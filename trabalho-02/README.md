@@ -91,6 +91,18 @@ Documentação específica:
 
 [Saiba mais](./ansible/README.md)
 
+## Docker, Docker Compose e Python (Flask/Gunicorn)
+
+Responsável pelo empacotamento, isolamento e execução da aplicação:
+
+* Criação de imagem leve com Python e servidor web Gunicorn
+* Orquestração de serviços com Docker Compose em rede privada
+* Execução de instâncias dinâmicas backend para retorno de IPs internos
+
+Documentação específica:
+
+[Saiba mais](./arquivos_do_app/README.md)
+
 ---
 
 # Pré-requisitos
